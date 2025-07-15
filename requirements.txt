@@ -5,3 +5,4 @@ Flask-Bcrypt
 PyJWT
 Werkzeug
 flasgger
+psycopg2-binary

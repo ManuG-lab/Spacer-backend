@@ -1,18 +1,17 @@
-from flask import Blueprint, request, jsonify, current_app 
+from flask import Blueprint, request, jsonify, current_app
 from models import User
 from extensions import db, bcrypt
 import jwt
 import datetime
 from functools import wraps
-# from app import app
 
 user_bp = Blueprint('users', __name__)
-SECRET_KEY = app.config['SECRET_KEY']
-bcrypt = Bcrypt(app)
 
-SECRET_KEY = app.config['SECRET_KEY']
+@user_bp.route('/', methods=['GET'])
+def get_users():
+    return jsonify({"message": "List of users"})
 
-# JWT decorator
+# JWT decorator for protected routes
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -25,7 +24,9 @@ def token_required(f):
             SECRET_KEY = current_app.config['SECRET_KEY']
             data = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
             current_user = User.query.filter_by(id=data['user_id']).first()
-        except:
+        except jwt.ExpiredSignatureError:
+            return jsonify({"message": "Token expired!"}), 401
+        except jwt.InvalidTokenError:
             return jsonify({"message": "Token is invalid!"}), 401
         return f(current_user, *args, **kwargs)
     return decorated
@@ -64,6 +65,10 @@ def register():
     data = request.json
     if 'role' in data and data['role'] == 'admin':
         return jsonify({"error": "Cannot create admin account"}), 403
+    
+    if User.query.filter_by(email=data['email']).first():
+        return jsonify({"error": "Email already exists"}), 409
+    
     hashed_pw = bcrypt.generate_password_hash(data['password']).decode('utf-8')
     user = User(name=data['name'], email=data['email'], password_hash=hashed_pw)
     db.session.add(user)
@@ -97,13 +102,6 @@ def login():
     responses:
       200:
         description: Login successful, returns JWT token
-        schema:
-          type: object
-          properties:
-            token:
-              type: string
-            role:
-              type: string
       401:
         description: Invalid credentials
     """
@@ -111,7 +109,13 @@ def login():
     user = User.query.filter_by(email=data['email']).first()
     if not user or not bcrypt.check_password_hash(user.password_hash, data['password']):
         return jsonify({"message": "Invalid credentials"}), 401
-    token = jwt.encode({'user_id': user.id, 'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)}, SECRET_KEY)
+    
+    SECRET_KEY = current_app.config['SECRET_KEY']
+    token = jwt.encode(
+        {'user_id': user.id, 'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)},
+        SECRET_KEY,
+        algorithm="HS256"
+    )
     return jsonify({"token": token, "role": user.role}), 200
 
 # Profile route
@@ -128,19 +132,6 @@ def profile(current_user):
     responses:
       200:
         description: Returns user profile data
-        schema:
-          type: object
-          properties:
-            id:
-              type: integer
-            name:
-              type: string
-            email:
-              type: string
-            role:
-              type: string
-      401:
-        description: Unauthorized or invalid token
     """
     return jsonify({
         "id": current_user.id,
@@ -148,4 +139,3 @@ def profile(current_user):
         "email": current_user.email,
         "role": current_user.role
     })
-
