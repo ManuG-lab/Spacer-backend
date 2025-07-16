@@ -1,6 +1,7 @@
 from flask import Flask
 from flask_migrate import Migrate
 from flasgger import Swagger
+from flask_jwt_extended import JWTManager
 from extensions import db, bcrypt
 from routes.user_routes import user_bp
 import os
@@ -11,21 +12,24 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Build database URI from individual variables
+# Build database URI dynamically from .env
 db_user = os.getenv('DB_USER')
 db_password = os.getenv('DB_PASSWORD')
 db_host = os.getenv('DB_HOST', 'localhost')
 db_port = os.getenv('DB_PORT', '5432')
 db_name = os.getenv('DB_NAME')
 
+# Configurations
 app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'supersecretjwtkey')  # For JWT
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize extensions
 db.init_app(app)
 bcrypt.init_app(app)
 migrate = Migrate(app, db)
+jwt = JWTManager(app)
 
 # Swagger setup
 swagger = Swagger(app, template={

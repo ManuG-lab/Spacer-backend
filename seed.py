@@ -1,21 +1,21 @@
 from app import app, db
 from models import User
-from werkzeug.security import generate_password_hash
+from extensions import bcrypt
+
 
 with app.app_context():
-    # Creating tables
     db.create_all()
 
-    # Hardcoded admin
     if not User.query.filter_by(email='admin@spacer.com').first():
         admin = User(
             name='Admin',
             email='admin@spacer.com',
             role='admin',
-            password_hash=generate_password_hash('Admin123!')
+            password_hash=bcrypt.generate_password_hash('Admin123!').decode('utf-8')
         )
         db.session.add(admin)
         db.session.commit()
         print("Admin user created successfully!")
     else:
         print("Admin already exists.")
+
