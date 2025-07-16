@@ -1,5 +1,41 @@
 
 from flask import Flask
+from flask_migrate import Migrate
+from flasgger import Swagger
+from flask_jwt_extended import JWTManager
+from extensions import db, bcrypt
+from routes.user_routes import user_bp
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+app = Flask(__name__)
+
+# Build database URI dynamically from .env
+db_user = os.getenv('DB_USER')
+db_password = os.getenv('DB_PASSWORD')
+db_host = os.getenv('DB_HOST', 'localhost')
+db_port = os.getenv('DB_PORT', '5432')
+db_name = os.getenv('DB_NAME')
+
+# Configurations
+app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'supersecretjwtkey')  # For JWT
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Initialize extensions
+db.init_app(app)
+bcrypt.init_app(app)
+migrate = Migrate(app, db)
+jwt = JWTManager(app)
+
+# Swagger setup
+
+
+from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
 from flasgger import Swagger
@@ -29,7 +65,7 @@ app.register_blueprint(payments_bp)
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()  # Just for first-time setup
-=======
+
 from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
 
@@ -71,16 +107,22 @@ migrate = Migrate(app, db)
 
 # Swagger with JWT Bearer auth
 
+
 swagger = Swagger(app, template={
     "swagger": "2.0",
     "info": {
         "title": "Spacer API",
+
+        "description": "API documentation for Spacer project",
+        "version": "1.0.0"
+
 
         "description": "API documentation for the Spacer event space booking platform.",
 
         "description": "API for managing space rentals",
 
         "version": "1.0"
+
     },
     "securityDefinitions": {
         "Bearer": {
@@ -88,14 +130,28 @@ swagger = Swagger(app, template={
             "name": "Authorization",
             "in": "header",
 
+            "description": "Enter: **Bearer <JWT>**"
+
+
             "description": "Enter: **Bearer &lt;your-JWT-token&gt;**"
 
             "description": "Enter: **Bearer &lt;your JWT&gt;**"
+
 
         }
     },
     "security": [{"Bearer": []}]
 })
+
+
+# Register blueprints
+app.register_blueprint(user_bp, url_prefix='/api/users')
+
+@app.route('/')
+def home():
+    return {"message": "Welcome to Spacer API"}
+
+if __name__ == '__main__':
 
 
 app.register_blueprint(spaces_bp, url_prefix='/api')
@@ -116,5 +172,6 @@ def home():
 
 
 if __name__ == '__main__':
+
 
     app.run(debug=True)

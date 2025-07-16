@@ -1,3 +1,13 @@
+
+Flask
+Flask-SQLAlchemy
+Flask-Migrate
+Flask-Bcrypt
+PyJWT
+Werkzeug
+flasgger
+psycopg2-binary
+
 alembic==1.16.4
 attrs==25.3.0
 bcrypt==4.3.0
@@ -30,3 +40,4 @@ SQLAlchemy==2.0.29
 sqlalchemy-serializer==1.4.22
 typing_extensions==4.14.1
 Werkzeug==3.1.3
+
