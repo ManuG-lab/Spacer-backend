@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, jsonify
 from flask_migrate import Migrate
 from flasgger import Swagger
 from flask_jwt_extended import JWTManager
@@ -12,26 +12,46 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Build database URI dynamically from .env
+# Build DB URI from .env
 db_user = os.getenv('DB_USER')
 db_password = os.getenv('DB_PASSWORD')
 db_host = os.getenv('DB_HOST', 'localhost')
 db_port = os.getenv('DB_PORT', '5432')
 db_name = os.getenv('DB_NAME')
 
-# Configurations
 app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
-app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'supersecretjwtkey')  # For JWT
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'supersecretjwtkey')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Initialize extensions
+# Init extensions
 db.init_app(app)
 bcrypt.init_app(app)
 migrate = Migrate(app, db)
 jwt = JWTManager(app)
 
-# Swagger setup
+#  Global JWT error handlers
+@jwt.unauthorized_loader
+def unauthorized_callback(msg):
+    return jsonify({"error": "Missing or invalid JWT token"}), 401
+
+@jwt.expired_token_loader
+def expired_token_callback(jwt_header, jwt_payload):
+    return jsonify({"error": "Token has expired"}), 401
+
+@jwt.invalid_token_loader
+def invalid_token_callback(msg):
+    return jsonify({"error": "Invalid token"}), 401
+
+@jwt.revoked_token_loader
+def revoked_token_callback(jwt_header, jwt_payload):
+    return jsonify({"error": "Token has been revoked"}), 401
+
+@jwt.user_lookup_error_loader
+def user_lookup_error_callback(jwt_header, jwt_payload):
+    return jsonify({"error": "User not found"}), 404
+
+# Swagger
 swagger = Swagger(app, template={
     "swagger": "2.0",
     "info": {
@@ -44,13 +64,13 @@ swagger = Swagger(app, template={
             "type": "apiKey",
             "name": "Authorization",
             "in": "header",
-            "description": "Enter: **Bearer <JWT>**"
+            "description": "Enter: **Bearer &lt;JWT&gt;**"
         }
     },
     "security": [{"Bearer": []}]
 })
 
-# Register blueprints
+# Register user routes
 app.register_blueprint(user_bp, url_prefix='/api/users')
 
 @app.route('/')
