@@ -4,9 +4,15 @@ from models import User
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from datetime import timedelta
 from mailjet_rest import Client
+import os
 
 
 user_bp = Blueprint('users', __name__)
+
+MAILJET_API_KEY = os.getenv("MAILJET_API_KEY")
+MAILJET_API_SECRET = os.getenv("MAILJET_API_SECRET")
+MAILJET_SENDER_EMAIL = os.getenv("MAILJET_SENDER_EMAIL")
+MAILJET_SENDER_NAME = os.getenv("MAILJET_SENDER_NAME")
 
 #  Utility: Check if current user is admin
 def is_admin():
