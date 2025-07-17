@@ -92,7 +92,10 @@ def login():
     if not user or not bcrypt.check_password_hash(user.password_hash, password):
         return jsonify({"error": "Invalid credentials"}), 401
 
-    token = create_access_token(identity=user.id, expires_delta=timedelta(hours=24))
+    token = create_access_token(identity={
+        "id": user.id,
+        "role": user.role,
+    }, expires_delta=timedelta(days=1))
     return jsonify({
         "message": "Login successful",
         "token": token,
@@ -228,7 +231,15 @@ def update_user(user_id):
     if 'password' in data:
         user.password_hash = bcrypt.generate_password_hash(data['password']).decode('utf-8')
     db.session.commit()
-    return jsonify({"message": "User updated successfully"})
+    return jsonify({
+    "message": "User updated successfully",
+    "user": {
+        "id": user.id,
+        "name": user.name,
+        "email": user.email,
+        "role": user.role
+    }
+})
 
 
 #  Delete user (Admin only)

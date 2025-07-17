@@ -13,6 +13,8 @@ def create_payment():
     Create a new payment
     ---
     tags: [Payments]
+    security:
+      - Bearer: []
     parameters:
       - in: body
         name: payment
@@ -37,7 +39,11 @@ def create_payment():
     )
     db.session.add(payment)
     db.session.commit()
-    return jsonify({'message': 'Payment created successfully'}), 201
+    return jsonify({
+    'message': 'Payment created successfully',
+    'payment': payment.to_dict()
+}), 201
+
 
 
 @payments_bp.route('/payments', methods=['GET'])
@@ -47,6 +53,8 @@ def get_all_payments():
     Get all payments
     ---
     tags: [Payments]
+    security:
+      - Bearer: []
     responses:
       200:
         description: List of payments
@@ -69,6 +77,8 @@ def get_payment(id):
     Get a payment by ID
     ---
     tags: [Payments]
+    security:
+      - Bearer: []
     parameters:
       - in: path
         name: id
@@ -97,6 +107,8 @@ def create_invoice():
     Create a new invoice
     ---
     tags: [Invoices]
+    security:
+      - Bearer: []
     parameters:
       - in: body
         name: invoice
@@ -128,6 +140,8 @@ def get_all_invoices():
     Get all invoices
     ---
     tags: [Invoices]
+    security:
+      - Bearer: []
     responses:
       200:
         description: List of invoices
@@ -148,6 +162,8 @@ def get_invoice(id):
     Get invoice by ID
     ---
     tags: [Invoices]
+    security:
+      - Bearer: []
     parameters:
       - in: path
         name: id
