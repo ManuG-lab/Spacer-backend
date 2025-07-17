@@ -18,24 +18,12 @@ load_dotenv()
 app = Flask(__name__)
 
 # --------------------------
-# Database Configuration
+# Environment and Config
 # --------------------------
-db_user = os.getenv('DB_USER', 'username')
-db_password = os.getenv('DB_PASSWORD', 'password')
-db_host = os.getenv('DB_HOST', 'localhost')
-db_port = os.getenv('DB_PORT', '5432')
-db_name = os.getenv('DB_NAME', 'spacer_db')
-
-app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'supersecretkey')
-app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'supersecretjwtkey')
-# Determine environment
 flask_env = os.getenv("FLASK_ENV", "development")
 
-# Security and config
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'super-secret-key')
-app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'super-secret-jwt-key')
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'supersecretkey')
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'supersecretjwtkey')
 
 # Database configuration
 if flask_env == "production":
@@ -46,9 +34,7 @@ if flask_env == "production":
     db_name = os.getenv('DB_NAME')
     app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
 else:
-    # Ensure instance folder exists
     os.makedirs(os.path.join(app.instance_path), exist_ok=True)
-    # Use instance folder for SQLite DB in development
     app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(app.instance_path, 'spacer.db')}"
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -66,7 +52,7 @@ db.init_app(app)
 bcrypt.init_app(app)
 migrate = Migrate(app, db)
 jwt = JWTManager(app)
-CORS(app)  # Enable CORS for all routes (Frontend integration)
+CORS(app)
 
 # --------------------------
 # Swagger Setup with JWT
@@ -83,7 +69,6 @@ swagger = Swagger(app, template={
             "type": "apiKey",
             "name": "Authorization",
             "in": "header",
-            "description": "Enter: **Bearer <JWT>**"
             "description": "Enter: **Bearer <your JWT>**"
         }
     },
@@ -116,7 +101,6 @@ def user_lookup_error_callback(jwt_header, jwt_payload):
 # --------------------------
 # Register Blueprints
 # --------------------------
-# Register Blueprints
 app.register_blueprint(user_bp, url_prefix='/api/users')
 app.register_blueprint(spaces_bp, url_prefix='/api/spaces')
 app.register_blueprint(bookings_bp, url_prefix='/api/bookings')
@@ -129,18 +113,14 @@ app.register_blueprint(payments_bp, url_prefix='/api/payments')
 def home():
     return jsonify({"message": "Welcome to the Spacer API 🎉"})
 
-# --------------------------
-# Run App
-# --------------------------
-if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()  # Only for first-time setup
-    app.run(debug=True)
 # Error handler example
 @app.errorhandler(404)
 def page_not_found(e):
     return jsonify({"error": "Endpoint not found"}), 404
 
+# --------------------------
+# Run App
+# --------------------------
 if __name__ == '__main__':
     debug_mode = True if flask_env == "development" else False
     app.run(debug=debug_mode)

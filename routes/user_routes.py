@@ -8,16 +8,18 @@ from flask_jwt_extended import (
     get_jwt
 )
 from datetime import timedelta
+import re
 
 user_bp = Blueprint('users', __name__)
 
-#  Utility: Check if current user is admin using JWT claims (no extra DB query)
+# Utility: Check if current user is admin
 def is_admin():
     claims = get_jwt()
     return claims.get('role') == 'admin'
 
-
-# Register a user
+# --------------------------
+# Register a new user
+# --------------------------
 @user_bp.route('/register', methods=['POST'])
 def register():
     """
@@ -25,14 +27,36 @@ def register():
     ---
     tags:
       - Users
+    parameters:
+      - in: body
+        name: body
+        schema:
+          type: object
+          properties:
+            name:
+              type: string
+            email:
+              type: string
+            password:
+              type: string
+    responses:
+      201:
+        description: User registered successfully
+      400:
+        description: Validation error or email exists
     """
     data = request.get_json()
     name = data.get('name')
     email = data.get('email')
     password = data.get('password')
 
+    # Validation
     if not name or not email or not password:
         return jsonify({"error": "All fields are required"}), 400
+    if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+        return jsonify({"error": "Invalid email format"}), 400
+    if len(password) < 6:
+        return jsonify({"error": "Password must be at least 6 characters"}), 400
 
     if User.query.filter_by(email=email).first():
         return jsonify({"error": "Email already exists"}), 400
@@ -44,15 +68,31 @@ def register():
 
     return jsonify({"message": "User registered successfully"}), 201
 
-
-# Login and return JWT with role claims
+# --------------------------
+# Login and return JWT
+# --------------------------
 @user_bp.route('/login', methods=['POST'])
 def login():
     """
-    Login a user and return JWT
+    Login a user and return JWT token
     ---
     tags:
       - Users
+    parameters:
+      - in: body
+        name: body
+        schema:
+          type: object
+          properties:
+            email:
+              type: string
+            password:
+              type: string
+    responses:
+      200:
+        description: Login successful
+      401:
+        description: Invalid credentials
     """
     data = request.get_json()
     email = data.get('email')
@@ -62,7 +102,6 @@ def login():
     if not user or not bcrypt.check_password_hash(user.password_hash, password):
         return jsonify({"error": "Invalid credentials"}), 401
 
-    # Add user role in JWT claims
     token = create_access_token(
         identity=user.id,
         additional_claims={"role": user.role},
@@ -75,11 +114,23 @@ def login():
         "user": {"id": user.id, "name": user.name, "email": user.email, "role": user.role}
     })
 
-
-#  Get current user's profile
+# --------------------------
+# Get current user's profile
+# --------------------------
 @user_bp.route('/profile', methods=['GET'])
 @jwt_required()
 def profile():
+    """
+    Get current user's profile
+    ---
+    tags:
+      - Users
+    security:
+      - Bearer: []
+    responses:
+      200:
+        description: User profile
+    """
     user_id = get_jwt_identity()
     user = User.query.get_or_404(user_id)
     return jsonify({
@@ -89,11 +140,25 @@ def profile():
         "role": user.role
     })
 
-
-#  Get all users (Admin only)
+# --------------------------
+# Get all users (Admin only)
+# --------------------------
 @user_bp.route('/', methods=['GET'])
 @jwt_required()
 def get_all_users():
+    """
+    Get all users (Admin only)
+    ---
+    tags:
+      - Users
+    security:
+      - Bearer: []
+    responses:
+      200:
+        description: List of users
+      403:
+        description: Admins only
+    """
     if not is_admin():
         return jsonify({"error": "Admins only"}), 403
     users = User.query.all()
@@ -104,11 +169,20 @@ def get_all_users():
         "role": u.role
     } for u in users])
 
-
+# --------------------------
 # Get user by ID (Admin only)
+# --------------------------
 @user_bp.route('/<int:user_id>', methods=['GET'])
 @jwt_required()
 def get_user(user_id):
+    """
+    Get a user by ID (Admin only)
+    ---
+    tags:
+      - Users
+    security:
+      - Bearer: []
+    """
     if not is_admin():
         return jsonify({"error": "Admins only"}), 403
     user = User.query.get_or_404(user_id)
@@ -119,13 +193,24 @@ def get_user(user_id):
         "role": user.role
     })
 
-
-#  Update user (Admin only)
+# --------------------------
+# Update user (Admin or self)
+# --------------------------
 @user_bp.route('/<int:user_id>', methods=['PUT'])
 @jwt_required()
 def update_user(user_id):
-    if not is_admin():
-        return jsonify({"error": "Admins only"}), 403
+    """
+    Update a user (Admin or self)
+    ---
+    tags:
+      - Users
+    security:
+      - Bearer: []
+    """
+    current_user_id = get_jwt_identity()
+    if user_id != current_user_id and not is_admin():
+        return jsonify({"error": "Unauthorized"}), 403
+
     user = User.query.get_or_404(user_id)
     data = request.get_json()
     user.name = data.get('name', user.name)
@@ -135,11 +220,20 @@ def update_user(user_id):
     db.session.commit()
     return jsonify({"message": "User updated successfully"})
 
-
+# --------------------------
 # Delete user (Admin only)
+# --------------------------
 @user_bp.route('/<int:user_id>', methods=['DELETE'])
 @jwt_required()
 def delete_user(user_id):
+    """
+    Delete a user (Admin only)
+    ---
+    tags:
+      - Users
+    security:
+      - Bearer: []
+    """
     if not is_admin():
         return jsonify({"error": "Admins only"}), 403
     user = User.query.get_or_404(user_id)
