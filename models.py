@@ -44,7 +44,6 @@ from datetime import datetime
 
 db = SQLAlchemy()
 
-payments-invoices
 class Payment(db.Model):
     __tablename__ = 'payments'
     id = db.Column(db.Integer, primary_key=True)
