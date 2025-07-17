@@ -55,6 +55,7 @@ def create_space():
       201:
         description: Space created
     """
+    
     identity = get_jwt_identity()
     if identity['role'] != 'owner':
         return jsonify({"error": "Only owners can create spaces"}), 403
