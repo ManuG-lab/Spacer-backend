@@ -1,8 +1,8 @@
-"""Initial migration
+"""initial
 
-Revision ID: a57c8f431868
+Revision ID: 4d883ad2b12c
 Revises: 
-Create Date: 2025-07-17 13:39:11.348460
+Create Date: 2025-07-17 20:10:02.558863
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'a57c8f431868'
+revision = '4d883ad2b12c'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -65,19 +65,23 @@ def upgrade():
     op.create_table('invoices',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('booking_id', sa.Integer(), nullable=False),
+    sa.Column('client_id', sa.Integer(), nullable=False),
     sa.Column('invoice_url', sa.String(length=255), nullable=False),
     sa.Column('issued_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['booking_id'], ['bookings.id'], ),
+    sa.ForeignKeyConstraint(['client_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('payments',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('booking_id', sa.Integer(), nullable=False),
+    sa.Column('client_id', sa.Integer(), nullable=False),
     sa.Column('amount', sa.Float(), nullable=False),
     sa.Column('payment_method', sa.String(length=50), nullable=False),
     sa.Column('payment_status', sa.Enum('pending', 'completed', 'failed', name='payment_status_enum'), nullable=True),
     sa.Column('payment_date', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['booking_id'], ['bookings.id'], ),
+    sa.ForeignKeyConstraint(['client_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     # ### end Alembic commands ###

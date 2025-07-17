@@ -73,15 +73,15 @@ swagger = Swagger(app, template={
 })
 
 # Register Blueprints
-app.register_blueprint(user_bp, url_prefix='/api/users')
-app.register_blueprint(spaces_bp, url_prefix='/api/spaces')
-app.register_blueprint(bookings_bp, url_prefix='/api/bookings')
-app.register_blueprint(payments_bp, url_prefix='/api/payments')
+app.register_blueprint(user_bp, url_prefix='/api')
+app.register_blueprint(spaces_bp, url_prefix='/api')
+app.register_blueprint(bookings_bp, url_prefix='/api')
+app.register_blueprint(payments_bp, url_prefix='/api')
 
 # Home route
 @app.route('/')
 def home():
-    return jsonify({"message": "Welcome to the Spacer API 🎉"})
+    return jsonify({"message": "Welcome to the Spacer API "})
 
 # Error handler example
 @app.errorhandler(404)

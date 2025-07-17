@@ -2,9 +2,20 @@
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, Space
+from models import db, Space, User
 
 spaces_bp = Blueprint('spaces', __name__)
+
+@spaces_bp.route('/spaces/my', methods=['GET'])
+@jwt_required()
+def get_my_spaces():
+    owner_id = int(get_jwt_identity())  
+    
+    
+    my_spaces = Space.query.filter_by(owner_id=owner_id).all()
+    
+    return jsonify([space.to_dict() for space in my_spaces]), 200
+
 
 @spaces_bp.route('/spaces', methods=['GET'])
 def get_spaces():
@@ -57,12 +68,14 @@ def create_space():
     """
     
     identity = get_jwt_identity()
-    if identity['role'] != 'owner':
+    user = User.query.get(identity)
+    if not user or user.role != 'owner':
         return jsonify({"error": "Only owners can create spaces"}), 403
+    
 
     data = request.get_json()
     space = Space(
-        owner_id=identity['id'],
+        owner_id=user.id,
         title=data['title'],
         description=data['description'],
         location=data['location'],
@@ -98,8 +111,12 @@ def update_space(id):
     """
     space = Space.query.get_or_404(id)
     identity = get_jwt_identity()
-    if identity['id'] != space.owner_id:
-        return jsonify({"error": "Unauthorized"}), 403
+    user = User.query.get(identity)
+    if not user or user.role != 'owner':
+        return jsonify({"error": "Only owners can update spaces"}), 403
+
+    if space.owner_id != user.id:
+        return jsonify({"error": "Unauthorized: You don't own this space"}), 403
 
     data = request.get_json()
     for field in ['title', 'description', 'location', 'capacity', 'amenities',
@@ -131,9 +148,13 @@ def delete_space(id):
     """
     space = Space.query.get_or_404(id)
     identity = get_jwt_identity()
-    if identity['id'] != space.owner_id:
-        return jsonify({"error": "Unauthorized"}), 403
+    user = User.query.get(identity)
+    if not user or user.role != 'owner':
+        return jsonify({"error": "Only owners can delete spaces"}), 403
 
+    if space.owner_id != user.id:
+        return jsonify({"error": "Unauthorized: You don't own this space"}), 403
+    
     db.session.delete(space)
     db.session.commit()
     return jsonify({"message": "Space deleted successfully"}), 200

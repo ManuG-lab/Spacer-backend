@@ -12,6 +12,12 @@ def is_admin():
     user = User.query.get(user_id)
     return user and user.role == 'admin'
 
+@user_bp.route('/logout', methods=['POST'])
+@jwt_required()
+def logout():
+    response = jsonify({"message": "Logged out successfully"})
+    #unset_jwt_cookies(response)  # Use this if you're storing tokens in cookies
+    return response, 200
 
 #  Register a user
 @user_bp.route('/register', methods=['POST'])
@@ -92,10 +98,7 @@ def login():
     if not user or not bcrypt.check_password_hash(user.password_hash, password):
         return jsonify({"error": "Invalid credentials"}), 401
 
-    token = create_access_token(identity={
-        "id": user.id,
-        "role": user.role,
-    }, expires_delta=timedelta(days=1))
+    token = create_access_token(identity=str(user.id,), expires_delta=timedelta(days=1))
     return jsonify({
         "message": "Login successful",
         "token": token,
@@ -129,7 +132,7 @@ def profile():
 
 
 #  Get all users (Admin only)
-@user_bp.route('/', methods=['GET'])
+@user_bp.route('/users', methods=['GET'])
 @jwt_required()
 def get_all_users():
     """
@@ -157,7 +160,7 @@ def get_all_users():
 
 
 #  Get user by ID (Admin only)
-@user_bp.route('/<int:user_id>', methods=['GET'])
+@user_bp.route('/users/<int:user_id>', methods=['GET'])
 @jwt_required()
 def get_user(user_id):
     """
@@ -190,7 +193,7 @@ def get_user(user_id):
 
 
 # Update user (Admin only)
-@user_bp.route('/<int:user_id>', methods=['PUT'])
+@user_bp.route('/users/<int:user_id>', methods=['PUT'])
 @jwt_required()
 def update_user(user_id):
     """
@@ -243,7 +246,7 @@ def update_user(user_id):
 
 
 #  Delete user (Admin only)
-@user_bp.route('/<int:user_id>', methods=['DELETE'])
+@user_bp.route('/users/<int:user_id>', methods=['DELETE'])
 @jwt_required()
 def delete_user(user_id):
     """
