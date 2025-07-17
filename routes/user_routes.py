@@ -3,6 +3,8 @@ from extensions import db, bcrypt
 from models import User
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from datetime import timedelta
+from mailjet_rest import Client
+
 
 user_bp = Blueprint('users', __name__)
 
@@ -12,11 +14,54 @@ def is_admin():
     user = User.query.get(user_id)
     return user and user.role == 'admin'
 
+
+def send_welcome_email(email, name):
+    mailjet = Client(auth=(MAILJET_API_KEY, MAILJET_API_SECRET), version='v3.1')
+
+    template = f"""
+    <h2>Welcome to Our Platform, {name}!</h2>
+    <p>We're thrilled to have you on board. Here’s what you can do:</p>
+    <ul>
+      <li>📝 Create and manage your spaces with ease.</li>
+      <li>🔐 Enjoy secure access using JWT authentication.</li>
+      <li>📷 Upload beautiful images directly.</li>
+      <li>📧 Receive important updates from us right in your inbox.</li>
+    </ul>
+    <p>Need help? Just reply to this email or contact our support team.</p>
+    <br>
+    <p>Cheers,</p>
+    <p><strong>{MAILJET_SENDER_NAME} Team</strong></p>
+    """
+
+    data = {
+        'Messages': [
+            {
+                "From": {
+                    "Email": MAILJET_SENDER_EMAIL,
+                    "Name": MAILJET_SENDER_NAME
+                },
+                "To": [
+                    {
+                        "Email": email,
+                        "Name": name
+                    }
+                ],
+                "Subject": "🎉 Welcome to Our Platform!",
+                "HTMLPart": template
+            }
+        ]
+    }
+
+    result = mailjet.send.create(data=data)
+    if result.status_code != 200:
+        print("Mailjet error:", result.json())
+
+
 @user_bp.route('/logout', methods=['POST'])
 @jwt_required()
 def logout():
     response = jsonify({"message": "Logged out successfully"})
-    #unset_jwt_cookies(response)  # Use this if you're storing tokens in cookies
+    
     return response, 200
 
 #  Register a user
@@ -61,6 +106,8 @@ def register():
     new_user = User(name=name, email=email, password_hash=hashed_pw)
     db.session.add(new_user)
     db.session.commit()
+    
+    send_welcome_email(email,name)
 
     return jsonify({"message": "User registered successfully"}), 201
 

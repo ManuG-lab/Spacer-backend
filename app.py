@@ -20,6 +20,12 @@ app = Flask(__name__)
 # Determine environment
 flask_env = os.getenv("FLASK_ENV", "development")
 
+# Mailjet configuration
+MAILJET_API_KEY = os.getenv("MAILJET_API_KEY")
+MAILJET_API_SECRET = os.getenv("MAILJET_API_SECRET")
+MAILJET_SENDER_EMAIL = os.getenv("MAILJET_SENDER_EMAIL")
+MAILJET_SENDER_NAME = os.getenv("MAILJET_SENDER_NAME")
+
 # Security and config
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'super-secret-key')
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'super-secret-jwt-key')
