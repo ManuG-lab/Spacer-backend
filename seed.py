@@ -64,9 +64,9 @@ with app.app_context():
             capacity=20,
             amenities="Wi-Fi, Coffee, Printer",
             price_per_hour=500,
-            price_per_day=4000,
+            price_per_day=7000,
             is_available=True,
-            main_image_url="https://example.com/space1.jpg"
+            main_image_url="https://www.pexels.com/photo/group-of-people-in-conference-room-1181304/"
         )
 
         space2 = Space(
@@ -79,7 +79,7 @@ with app.app_context():
             price_per_hour=800,
             price_per_day=6000,
             is_available=True,
-            main_image_url="https://example.com/space2.jpg"
+            main_image_url="https://www.pexels.com/photo/white-wooden-rectangular-table-159213/"
         )
         space3 = Space(
             owner_id=admin.id,
@@ -91,7 +91,7 @@ with app.app_context():
             price_per_hour=700,
             price_per_day=5000,
             is_available=True,
-            main_image_url="https://example.com/space3.jpg"
+            main_image_url="https://www.pexels.com/photo/group-of-women-gathered-inside-conference-room-1181611/"
         )
 
         space4 = Space(
@@ -104,7 +104,7 @@ with app.app_context():
             price_per_hour=1200,
             price_per_day=9000,
             is_available=True,
-            main_image_url="https://example.com/space4.jpg"
+            main_image_url="https://www.pexels.com/photo/square-beige-wooden-table-with-chairs-260928/"
         )
 
         space5 = Space(
@@ -117,7 +117,7 @@ with app.app_context():
             price_per_hour=2500,
             price_per_day=18000,
             is_available=True,
-            main_image_url="https://example.com/space5.jpg"
+            main_image_url="https://www.pexels.com/photo/red-theater-chair-lot-near-white-concrete-pillars-269140/"
         )
 
         space6 = Space(
@@ -130,7 +130,7 @@ with app.app_context():
             price_per_hour=1000,
             price_per_day=7500,
             is_available=True,
-            main_image_url="https://example.com/space6.jpg"
+            main_image_url="https://www.pexels.com/photo/conference-room-236730/"
         )
 
 

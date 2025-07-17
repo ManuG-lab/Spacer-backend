@@ -17,6 +17,12 @@ def is_admin():
     claims = get_jwt()
     return claims.get('role') == 'admin'
 
+@user_bp.route('/logout', methods=['POST'])
+@jwt_required()
+def logout():
+    response = jsonify({"message": "Logged out successfully"})
+    #unset_jwt_cookies(response)  # Use this if you're storing tokens in cookies
+    return response, 200
 # --------------------------
 # Register a new user
 # --------------------------
@@ -102,12 +108,10 @@ def login():
     if not user or not bcrypt.check_password_hash(user.password_hash, password):
         return jsonify({"error": "Invalid credentials"}), 401
 
-    token = create_access_token(
-        identity=user.id,
-        additional_claims={"role": user.role},
-        expires_delta=timedelta(hours=24)
-    )
-
+    token = create_access_token(identity={
+        "id": user.id,
+        "role": user.role,
+    }, expires_delta=timedelta(days=1))
     return jsonify({
         "message": "Login successful",
         "token": token,
@@ -140,9 +144,8 @@ def profile():
         "role": user.role
     })
 
-# --------------------------
-# Get all users (Admin only)
-# --------------------------
+
+#  Get all users (Admin only)
 @user_bp.route('/', methods=['GET'])
 @jwt_required()
 def get_all_users():
@@ -169,9 +172,8 @@ def get_all_users():
         "role": u.role
     } for u in users])
 
-# --------------------------
-# Get user by ID (Admin only)
-# --------------------------
+
+#  Get user by ID (Admin only)
 @user_bp.route('/<int:user_id>', methods=['GET'])
 @jwt_required()
 def get_user(user_id):
@@ -193,9 +195,8 @@ def get_user(user_id):
         "role": user.role
     })
 
-# --------------------------
-# Update user (Admin or self)
-# --------------------------
+
+# Update user (Admin only)
 @user_bp.route('/<int:user_id>', methods=['PUT'])
 @jwt_required()
 def update_user(user_id):
@@ -218,11 +219,18 @@ def update_user(user_id):
     if 'password' in data:
         user.password_hash = bcrypt.generate_password_hash(data['password']).decode('utf-8')
     db.session.commit()
-    return jsonify({"message": "User updated successfully"})
+    return jsonify({
+    "message": "User updated successfully",
+    "user": {
+        "id": user.id,
+        "name": user.name,
+        "email": user.email,
+        "role": user.role
+    }
+})
 
-# --------------------------
-# Delete user (Admin only)
-# --------------------------
+
+#  Delete user (Admin only)
 @user_bp.route('/<int:user_id>', methods=['DELETE'])
 @jwt_required()
 def delete_user(user_id):
