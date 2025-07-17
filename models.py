@@ -26,6 +26,12 @@ class User(db.Model, SerializerMixin):
     bookings = db.relationship('Booking', backref='client', lazy=True)
 
     serialize_rules = ('-password_hash', '-spaces.owner', '-bookings.client')
+    spaces = db.relationship('Space', back_populates='owner', lazy=True)
+    bookings = db.relationship('Booking', back_populates='client', lazy=True)
+    payments = db.relationship('Payment', back_populates='client', lazy=True)
+    invoices = db.relationship('Invoice', back_populates='client', lazy=True)
+
+    serialize_rules = ('-password_hash', '-spaces.owner', '-bookings.client', '-payments.client', '-invoices.client')
 
     def __repr__(self):
         return f'<User {self.email}>'
@@ -37,11 +43,9 @@ class User(db.Model, SerializerMixin):
 class Space(db.Model, SerializerMixin):
     __tablename__ = 'spaces'
 
-    serialize_only = (
-        'id', 'owner_id', 'title', 'description', 'location',
-        'capacity', 'amenities', 'price_per_hour', 'price_per_day',
-        'is_available', 'main_image_url', 'created_at'
-    )
+    serialize_only = ('id', 'owner_id', 'title', 'description', 'location',
+                      'capacity', 'amenities', 'price_per_hour', 'price_per_day',
+                      'is_available', 'main_image_url', 'created_at')
 
     id = db.Column(db.Integer, primary_key=True)
     owner_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
@@ -60,6 +64,11 @@ class Space(db.Model, SerializerMixin):
     bookings = db.relationship('Booking', backref='space', lazy=True)
 
     serialize_rules = ('-owner.password_hash', '-owner.spaces', '-bookings.space')
+    # Relationships
+    owner = db.relationship('User', back_populates='spaces')
+    bookings = db.relationship('Booking', back_populates='space', lazy=True)
+
+    serialize_rules = ('-owner.password_hash', '-owner.spaces', '-bookings.space',)
 
     def __repr__(self):
         return f'<Space {self.title}>'
@@ -89,6 +98,12 @@ class Booking(db.Model, SerializerMixin):
     invoice = db.relationship('Invoice', backref='booking', uselist=False)
 
     serialize_rules = ('-client.password_hash', '-space.bookings')
+    client = db.relationship('User', back_populates='bookings')
+    space = db.relationship('Space', back_populates='bookings')
+    payments = db.relationship('Payment', back_populates='booking', lazy=True)
+    invoice = db.relationship('Invoice', back_populates='booking', uselist=False)
+
+    serialize_rules = ('-client.password_hash', '-client.bookings', '-space.bookings',)
 
     def calculate_duration(self):
         delta = self.end_datetime - self.start_datetime
@@ -100,6 +115,8 @@ class Booking(db.Model, SerializerMixin):
 
     def __repr__(self):
         return f'<Booking {self.id} - Status: {self.status}>'
+        return f'<Booking {self.id}, Status: {self.status}>'
+
 
 
 # -------------------------
@@ -112,12 +129,18 @@ class Payment(db.Model, SerializerMixin):
 
     id = db.Column(db.Integer, primary_key=True)
     booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'), nullable=False)
+    client_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     amount = db.Column(db.Float, nullable=False)
     payment_method = db.Column(db.String(50), nullable=False)
     payment_status = db.Column(db.Enum('pending', 'completed', 'failed', name='payment_status_enum'), default='pending')
     payment_date = db.Column(db.DateTime, default=datetime.utcnow)
 
     serialize_rules = ('-booking.space.bookings',)
+    # Relationships
+    booking = db.relationship('Booking', back_populates='payments')
+    client = db.relationship('User', back_populates='payments')
+
+    serialize_rules = ('-booking.client.password_hash', '-booking.space.bookings',)
 
     def __repr__(self):
         return f'<Payment {self.id} for Booking {self.booking_id}>'
@@ -133,6 +156,7 @@ class Invoice(db.Model, SerializerMixin):
 
     id = db.Column(db.Integer, primary_key=True)
     booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'), nullable=False)
+    client_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     invoice_url = db.Column(db.String(255), nullable=False)
     issued_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -140,3 +164,11 @@ class Invoice(db.Model, SerializerMixin):
 
     def __repr__(self):
         return f'<Invoice {self.id} for Booking {self.booking_id}>'
+    # Relationships
+    booking = db.relationship('Booking', back_populates='invoice')
+    client = db.relationship('User', back_populates='invoices')
+
+    serialize_rules = ('-booking.client.password_hash', '-booking.space.bookings',)
+
+    def __repr__(self):
+        return f'<Invoice {self.id} for Booking {self.booking.id}, URL: {self.invoice_url}>'
