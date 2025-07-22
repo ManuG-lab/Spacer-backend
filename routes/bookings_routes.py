@@ -49,6 +49,11 @@ def create_booking():
         end_datetime=end_datetime
     )
 
+    new_booking.space = space  
+
+    new_booking.calculate_duration()
+    new_booking.calculate_total_price()
+
     db.session.add(new_booking)
     db.session.commit()
 
