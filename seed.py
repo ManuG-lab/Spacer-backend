@@ -65,7 +65,7 @@ with app.app_context():
                 price_per_hour=500,
                 price_per_day=7000,
                 is_available=True,
-                main_image_url="https://www.pexels.com/photo/group-of-people-in-conference-room-1181304/"
+                main_image_url="https://images.pexels.com/photos/1181304/pexels-photo-1181304.jpeg"
             ),
             Space(
                 owner_id=owner.id,
@@ -77,7 +77,7 @@ with app.app_context():
                 price_per_hour=800,
                 price_per_day=6000,
                 is_available=True,
-                main_image_url="https://www.pexels.com/photo/white-wooden-rectangular-table-159213/"
+                main_image_url="https://images.pexels.com/photos/159213/hall-congress-architecture-building-159213.jpeg"
             ),
             Space(
                 owner_id=owner.id,
@@ -89,7 +89,7 @@ with app.app_context():
                 price_per_hour=700,
                 price_per_day=5000,
                 is_available=True,
-                main_image_url="https://www.pexels.com/photo/group-of-women-gathered-inside-conference-room-1181611/"
+                main_image_url="https://images.pexels.com/photos/1181611/pexels-photo-1181611.jpeg"
             ),
         ]
         db.session.add_all(spaces)
