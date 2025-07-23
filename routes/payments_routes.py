@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, Payment, Invoice, Booking, User, Space
 from datetime import datetime
 import os
@@ -11,6 +11,7 @@ api_secret = os.getenv('MAILJET_API_SECRET')
 mailjet = Client(auth=(api_key, api_secret), version='v3.1')
 
 payments_bp = Blueprint('payments', __name__)
+
 
 
 
@@ -51,11 +52,14 @@ def create_payment():
 
     if not booking or booking.client_id != user.id:
         return jsonify({"error": "Unauthorized or invalid booking"}), 403
+    
+    client_id = get_jwt_identity()
 
     payment = Payment(
         booking_id=data['booking_id'],
         amount=data['amount'],
-        payment_method=data['payment_method']
+        payment_method=data['payment_method'],
+        client_id=client_id,
     )
     db.session.add(payment)
     db.session.commit()
@@ -82,6 +86,7 @@ def get_all_payments():
     """
     identity = get_jwt_identity()
     user = User.query.get(identity)
+    
 
     if user.role == 'admin':
         # Admin can view all payments
@@ -89,6 +94,12 @@ def get_all_payments():
     elif user.role == 'client':
         # Clients can view only their payments
         payments = Payment.query.join(Booking).filter(Booking.client_id == user.id).all()
+    elif user.role == 'owner':
+        # Owners can view payments related to their spaces
+        space_ids = [space.id for space in Space.query.filter_by(owner_id=user.id).all()]
+        payments = Payment.query.join(Booking).filter(Booking.space_id.in_(space_ids)).all()
+        client_ids = [booking.client_id for booking in Booking.query.filter(Booking.space_id.in_(space_ids)).all()]
+        payments = Payment.query.filter(Payment.client_id.in_(client_ids)).all()
     else:
         return jsonify({"error": "Unauthorized"}), 403
 
@@ -140,7 +151,7 @@ def confirm_payment(id):
     if space.owner_id != user.id:
         return jsonify({"error": "Unauthorized: not your space"}), 403
 
-    payment.payment_status = 'confirmed'
+    payment.payment_status = 'completed'
     payment.payment_date = datetime.utcnow()
     db.session.commit()
 
@@ -208,6 +219,8 @@ def get_owner_payments():
 
     if not owner or owner.role != 'owner':
         return jsonify({"error": "Unauthorized access"}), 403
+    
+    
 
     # Get all spaces owned by this user
     owner_space_ids = [space.id for space in Space.query.filter_by(owner_id=owner.id).all()]
@@ -264,7 +277,7 @@ def create_invoice():
         return jsonify({'message': 'Missing booking_id'}), 400
 
     booking = Booking.query.get(booking_id)
-    if not booking or not booking.confirmed:
+    if not booking:
         return jsonify({'message': 'Invalid or unconfirmed booking'}), 400
 
     # Check for existing invoice
