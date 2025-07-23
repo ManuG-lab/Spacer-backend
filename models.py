@@ -66,7 +66,8 @@ class Space(db.Model, SerializerMixin):
     serialize_rules = ('-owner.password_hash', '-owner.spaces', '-bookings.space')
     # Relationships
     owner = db.relationship('User', back_populates='spaces')
-    bookings = db.relationship('Booking', back_populates='space', lazy=True)
+    bookings = db.relationship("Booking", back_populates="space", cascade="all, delete-orphan")
+
 
     serialize_rules = ('-owner.password_hash', '-owner.spaces', '-bookings.space',)
 
@@ -84,7 +85,7 @@ class Booking(db.Model, SerializerMixin):
 
     id = db.Column(db.Integer, primary_key=True)
     client_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    space_id = db.Column(db.Integer, db.ForeignKey('spaces.id'), nullable=False)
+    space_id = db.Column(db.Integer, db.ForeignKey('spaces.id', ondelete="CASCADE"))
     start_datetime = db.Column(db.DateTime, nullable=False)
     end_datetime = db.Column(db.DateTime, nullable=False)
     duration_hours = db.Column(db.Integer)
@@ -125,7 +126,7 @@ class Booking(db.Model, SerializerMixin):
 class Payment(db.Model, SerializerMixin):
     __tablename__ = 'payments'
 
-    serialize_only = ('id', 'booking_id', 'amount', 'payment_method', 'payment_status', 'payment_date')
+    serialize_only = ('id', 'booking_id', 'amount', 'payment_method', 'payment_status', 'payment_date','client_id')
 
     id = db.Column(db.Integer, primary_key=True)
     booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'), nullable=False)

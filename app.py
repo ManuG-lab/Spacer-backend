@@ -15,111 +15,86 @@ from routes.payments_routes import payments_bp
 # Load environment variables from .env
 load_dotenv()
 
-app = Flask(__name__)
+def create_app(testing=True):
+    app = Flask(__name__)
 
-# --------------------------
-# Environment and Config
-# --------------------------
-flask_env = os.getenv("FLASK_ENV", "development")
+    # Determine environment
+    flask_env = os.getenv("FLASK_ENV", "development")
 
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'supersecretkey')
-app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'supersecretjwtkey')
+    # Security and config
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'super-secret-key')
+    app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'super-secret-jwt-key')
 
-# Database configuration
-if flask_env == "production":
-    db_user = os.getenv('DB_USER')
-    db_password = os.getenv('DB_PASSWORD')
-    db_host = os.getenv('DB_HOST', 'localhost')
-    db_port = os.getenv('DB_PORT', '5432')
-    db_name = os.getenv('DB_NAME')
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
-else:
-    os.makedirs(os.path.join(app.instance_path), exist_ok=True)
-    app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(app.instance_path, 'spacer.db')}"
+    # Database configuration
+    if flask_env == "production":
+        db_user = os.getenv('DB_USER')
+        db_password = os.getenv('DB_PASSWORD')
+        db_host = os.getenv('DB_HOST', 'localhost')
+        db_port = os.getenv('DB_PORT', '5432')
+        db_name = os.getenv('DB_NAME')
+        app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
+    else:
+        app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///spacer.db"
 
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    TESTING = True 
 
-# Swagger configuration
-app.config['SWAGGER'] = {
-    'title': 'Spacer API',
-    'uiversion': 3
-}
+    # Swagger configuration
+    app.config['SWAGGER'] = {
+        'title': 'Spacer API',
+        'uiversion': 3
+    }
 
-# --------------------------
-# Initialize Extensions
-# --------------------------
-db.init_app(app)
-bcrypt.init_app(app)
-migrate = Migrate(app, db)
-jwt = JWTManager(app)
-CORS(app)
+    # Initialize extensions
+    db.init_app(app)
+    bcrypt.init_app(app)
+    Migrate(app, db)
+    JWTManager(app)
+    CORS(app)
 
-# --------------------------
-# Swagger Setup with JWT
-# --------------------------
-swagger = Swagger(app, template={
-    "swagger": "2.0",
-    "info": {
-        "title": "Spacer API",
-        "description": "API documentation for the Spacer event space booking platform.",
-        "version": "1.0.0"
-    },
-    "securityDefinitions": {
-        "Bearer": {
-            "type": "apiKey",
-            "name": "Authorization",
-            "in": "header",
-            "description": "Enter: **Bearer <your JWT>**"
-        }
-    },
-    "security": [{"Bearer": []}]
-})
+    # Swagger setup with JWT Bearer authentication
+    Swagger(app, template={
+        "swagger": "2.0",
+        "info": {
+            "title": "Spacer API",
+            "description": "API documentation for the Spacer event space booking platform.",
+            "version": "1.0.0"
+        },
+        "securityDefinitions": {
+            "Bearer": {
+                "type": "apiKey",
+                "name": "Authorization",
+                "in": "header",
+                "description": "Enter: **Bearer <your JWT>**"
+            }
+        },
+        "security": [{"Bearer": []}]
+    })
 
-# --------------------------
-# JWT Error Handlers
-# --------------------------
-@jwt.unauthorized_loader
-def unauthorized_callback(msg):
-    return jsonify({"error": "Missing or invalid JWT token"}), 401
+    # Register Blueprints with clear prefixes
+    app.register_blueprint(user_bp, url_prefix='/api')
+    app.register_blueprint(spaces_bp, url_prefix='/api')
+    app.register_blueprint(bookings_bp, url_prefix='/api')
+    app.register_blueprint(payments_bp, url_prefix='/api')
 
-@jwt.expired_token_loader
-def expired_token_callback(jwt_header, jwt_payload):
-    return jsonify({"error": "Token has expired"}), 401
+    # Home route
+    @app.route('/')
+    def home():
+        return jsonify({"message": "Welcome to the Spacer API"})
 
-@jwt.invalid_token_loader
-def invalid_token_callback(msg):
-    return jsonify({"error": "Invalid token"}), 401
+    # Error handler example
+    @app.errorhandler(404)
+    def page_not_found(e):
+        return jsonify({"error": "Endpoint not found"}), 404
 
-@jwt.revoked_token_loader
-def revoked_token_callback(jwt_header, jwt_payload):
-    return jsonify({"error": "Token has been revoked"}), 401
+    return app
 
-@jwt.user_lookup_error_loader
-def user_lookup_error_callback(jwt_header, jwt_payload):
-    return jsonify({"error": "User not found"}), 404
-
-# --------------------------
-# Register Blueprints
-app.register_blueprint(user_bp, url_prefix='/api')
-app.register_blueprint(spaces_bp, url_prefix='/api')
-app.register_blueprint(bookings_bp, url_prefix='/api')
-app.register_blueprint(payments_bp, url_prefix='/api')
-
-# --------------------------
-# Home Route
-# --------------------------
-@app.route('/')
-def home():
-    return jsonify({"message": "Welcome to the Spacer API "})
-
-# Error handler example
-@app.errorhandler(404)
-def page_not_found(e):
-    return jsonify({"error": "Endpoint not found"}), 404
+app = create_app()
 
 # --------------------------
 # Run App
 # --------------------------
 if __name__ == '__main__':
-    debug_mode = True if flask_env == "development" else False
+    debug_mode = os.getenv("FLASK_ENV", "development") == "development"
     app.run(debug=debug_mode)
+

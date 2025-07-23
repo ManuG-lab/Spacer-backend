@@ -1,8 +1,17 @@
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required
-from models import db, Payment, Invoice
+from flask import Blueprint, request, jsonify, current_app
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from models import db, Payment, Invoice, Booking, User, Space
+from datetime import datetime
+import os
+from mailjet_rest import Client
+
+
+api_key = os.getenv('MAILJET_API_KEY')
+api_secret = os.getenv('MAILJET_API_SECRET')
+mailjet = Client(auth=(api_key, api_secret), version='v3.1')
 
 payments_bp = Blueprint('payments', __name__)
+
 
 
 
@@ -31,18 +40,34 @@ def create_payment():
       201:
         description: Payment created
     """
+    identity = get_jwt_identity()
+    user = User.query.get(identity)
+    
+    if not user or user.role != 'client':
+        return jsonify({"error": "Only clients can create payments"}), 403
+
     data = request.get_json()
+
+    booking = Booking.query.get(data['booking_id'])
+
+    if not booking or booking.client_id != user.id:
+        return jsonify({"error": "Unauthorized or invalid booking"}), 403
+    
+    client_id = get_jwt_identity()
+
     payment = Payment(
         booking_id=data['booking_id'],
         amount=data['amount'],
-        payment_method=data['payment_method']
+        payment_method=data['payment_method'],
+        client_id=client_id,
     )
     db.session.add(payment)
     db.session.commit()
+
     return jsonify({
-    'message': 'Payment created successfully',
-    'payment': payment.to_dict()
-}), 201
+        'message': 'Payment created successfully',
+        'payment': payment.to_dict()
+    }), 201
 
 
 
@@ -59,15 +84,26 @@ def get_all_payments():
       200:
         description: List of payments
     """
-    payments = Payment.query.all()
-    return jsonify([{
-        'id': p.id,
-        'booking_id': p.booking_id,
-        'amount': p.amount,
-        'payment_method': p.payment_method,
-        'payment_status': p.payment_status,
-        'payment_date': p.payment_date.isoformat()
-    } for p in payments]), 200
+    identity = get_jwt_identity()
+    user = User.query.get(identity)
+    
+
+    if user.role == 'admin':
+        # Admin can view all payments
+        payments = Payment.query.all()
+    elif user.role == 'client':
+        # Clients can view only their payments
+        payments = Payment.query.join(Booking).filter(Booking.client_id == user.id).all()
+    elif user.role == 'owner':
+        # Owners can view payments related to their spaces
+        space_ids = [space.id for space in Space.query.filter_by(owner_id=user.id).all()]
+        payments = Payment.query.join(Booking).filter(Booking.space_id.in_(space_ids)).all()
+        client_ids = [booking.client_id for booking in Booking.query.filter(Booking.space_id.in_(space_ids)).all()]
+        payments = Payment.query.filter(Payment.client_id.in_(client_ids)).all()
+    else:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    return jsonify([p.to_dict() for p in payments]), 200
 
 
 @payments_bp.route('/payments/<int:id>', methods=['GET'])
@@ -88,23 +124,133 @@ def get_payment(id):
       200:
         description: Payment data
     """
-    payment = Payment.query.get_or_404(id)
-    return jsonify({
-        'id': payment.id,
-        'booking_id': payment.booking_id,
-        'amount': payment.amount,
-        'payment_method': payment.payment_method,
-        'payment_status': payment.payment_status,
-        'payment_date': payment.payment_date.isoformat()
-    })
+    identity = get_jwt_identity()
+    user = User.query.get(identity)
 
+    payment = Payment.query.get_or_404(id)
+    booking = Booking.query.get(payment.booking_id)
+
+    if user.role == 'admin' or (user.role == 'client' and booking.client_id == user.id):
+        return jsonify(payment.to_dict()), 200
+
+    return jsonify({"error": "Unauthorized"}), 403
+
+@payments_bp.route('/payments/<int:id>/confirm', methods=['PATCH'])
+@jwt_required()
+def confirm_payment(id):
+    identity = get_jwt_identity()
+    user = User.query.get(identity)
+
+    if not user or user.role != 'owner':
+        return jsonify({"error": "Only space owners can confirm payments"}), 403
+
+    payment = Payment.query.get_or_404(id)
+    booking = Booking.query.get(payment.booking_id)
+    space = Space.query.get(booking.space_id)
+
+    if space.owner_id != user.id:
+        return jsonify({"error": "Unauthorized: not your space"}), 403
+
+    payment.payment_status = 'completed'
+    payment.payment_date = datetime.utcnow()
+    db.session.commit()
+
+     # Get the client details
+    client = User.query.get(booking.client_id)
+
+    # Mailjet API setup
+    mailjet = Client(
+        auth=(os.getenv("MAILJET_API_KEY"), os.getenv("MAILJET_API_SECRET")),
+        version='v3.1'
+    )
+
+    email_data = {
+        'Messages': [
+            {
+                "From": {
+                    "Email": "your_email@example.com",
+                    "Name": "Spacer"
+                },
+                "To": [
+                    {
+                        "Email": client.email,
+                        "Name": client.name
+                    }
+                ],
+                "Subject": "Payment Confirmed for Your Booking",
+                "TextPart": f"Hi {client.name}, your payment for '{space.title}' has been confirmed.",
+                "HTMLPart": f"""
+                <div style="font-family: Arial, sans-serif; color: #333;">
+                    <h2 style="color: #4CAF50;">Hello {client.name},</h2>
+                    <p>We're excited to let you know that your payment for the booking at <strong>{space.title}</strong> has been <span style="color:green;"><strong>confirmed</strong></span>.</p>
+                    <p>Booking Details:</p>
+                    <ul>
+                        <li><strong>Space:</strong> {space.title}</li>
+                        <li><strong>Location:</strong> {space.location}</li>
+                        <li><strong>Payment Status:</strong> Confirmed</li>
+                        <li><strong>Date:</strong> {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}</li>
+                    </ul>
+                    <p>Thank you for using <strong>Spacer</strong>!</p>
+                    <br/>
+                    <p style="font-size: 0.9em; color: #888;">This is an automated message. Please do not reply.</p>
+                </div>
+                """
+            }
+        ]
+    }
+
+    try:
+        result = mailjet.send.create(data=email_data)
+        if result.status_code != 200:
+            current_app.logger.error(f"Failed to send email: {result.json()}")
+    except Exception as e:
+        current_app.logger.error(f"Mailjet exception: {str(e)}")
+
+    return jsonify({"message": "Payment confirmed and email sent", "payment": payment.to_dict()}), 200
+
+    
+
+@payments_bp.route('/owner/payments', methods=['GET'])
+
+@jwt_required()
+def get_owner_payments():
+    user_id = get_jwt_identity()
+    owner = User.query.get(user_id)
+
+    if not owner or owner.role != 'owner':
+        return jsonify({"error": "Unauthorized access"}), 403
+    
+    
+
+    # Get all spaces owned by this user
+    owner_space_ids = [space.id for space in Space.query.filter_by(owner_id=owner.id).all()]
+
+    # Get all bookings for those spaces
+    bookings = Booking.query.filter(Booking.space_id.in_(owner_space_ids)).all()
+    booking_ids = [booking.id for booking in bookings]
+
+    # Get invoices related to those bookings
+    invoices = Invoice.query.filter(Invoice.booking_id.in_(booking_ids)).all()
+
+    result = []
+    for invoice in invoices:
+        result.append({
+            "invoice_id": invoice.id,
+            "booking_id": invoice.booking_id,
+            "client_id": invoice.client_id,
+            "invoice_url": invoice.invoice_url,
+            "issued_at": invoice.issued_at.strftime('%Y-%m-%d %H:%M'),
+            "total_price": Booking.query.get(invoice.booking_id).total_price
+        })
+
+    return jsonify(result), 200
 
 
 @payments_bp.route('/invoices', methods=['POST'])
 @jwt_required()
 def create_invoice():
     """
-    Create a new invoice
+    Create a new invoice and send it via email
     ---
     tags: [Invoices]
     security:
@@ -117,21 +263,82 @@ def create_invoice():
           properties:
             booking_id:
               type: integer
-            invoice_url:
-              type: string
     responses:
       201:
         description: Invoice created
+      400:
+        description: Booking not confirmed or invalid
+      409:
+        description: Invoice already exists
     """
     data = request.get_json()
+    booking_id = data.get('booking_id')
+    if not booking_id:
+        return jsonify({'message': 'Missing booking_id'}), 400
+
+    booking = Booking.query.get(booking_id)
+    if not booking:
+        return jsonify({'message': 'Invalid or unconfirmed booking'}), 400
+
+    # Check for existing invoice
+    if Invoice.query.filter_by(booking_id=booking_id).first():
+        return jsonify({'message': 'Invoice already exists'}), 409
+
+    # Generate invoice_url (fake for now, real would be PDF or view route)
+    invoice_url = f"https://spacer.com/invoice/{booking_id}"
+
     invoice = Invoice(
-        booking_id=data['booking_id'],
-        invoice_url=data['invoice_url']
+        booking_id=booking_id,
+        invoice_url=invoice_url
     )
     db.session.add(invoice)
     db.session.commit()
-    return jsonify({'message': 'Invoice created successfully'}), 201
 
+    # Send email using Mailjet
+    user = booking.user 
+    space = booking.space  
+
+    html_template = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px;">
+        <h2 style="color: #4CAF50;">📄 Invoice for Booking #{booking.id}</h2>
+        <p>Hello {user.name},</p>
+        <p>Thank you for booking <strong>{space.title}</strong> at {space.location}.</p>
+        <hr>
+        <p><strong>Booking Date:</strong> {booking.created_at.strftime('%B %d, %Y')}</p>
+        <p><strong>Capacity:</strong> {space.capacity}</p>
+        <p><strong>Total Price:</strong> ${space.price_per_day:.2f}</p>
+        <hr>
+        <p>You can view your invoice <a href="{invoice_url}" style="color: #4CAF50;">here</a>.</p>
+        <p>Kind regards,<br><strong>Spacer Team</strong></p>
+    </div>
+    """
+
+    # Prepare Mailjet data
+
+    data = {
+      'Messages': [
+        {
+          "From": {
+            "Email": "no-reply@spacer.com",
+            "Name": "Spacer"
+          },
+          "To": [
+            {
+              "Email": user.email,
+              "Name": user.name
+            }
+          ],
+          "Subject": f"Your Invoice for Booking #{booking.id}",
+          "HTMLPart": html_template
+        }
+      ]
+    }
+
+    result = mailjet.send.create(data=data)
+    if result.status_code != 200:
+        return jsonify({'message': 'Invoice created, but email failed'}), 500
+
+    return jsonify({'message': 'Invoice created and sent successfully'}), 201
 
 @payments_bp.route('/invoices', methods=['GET'])
 @jwt_required()

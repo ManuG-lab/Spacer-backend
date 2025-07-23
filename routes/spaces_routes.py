@@ -155,6 +155,9 @@ def delete_space(id):
     if space.owner_id != user.id:
         return jsonify({"error": "Unauthorized: You don't own this space"}), 403
     
+    if space.bookings:  # Check for related bookings
+        return jsonify({"error": "Cannot delete space with existing bookings."}), 400
+    
     db.session.delete(space)
     db.session.commit()
     return jsonify({"message": "Space deleted successfully"}), 200

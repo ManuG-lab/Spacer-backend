@@ -8,20 +8,70 @@ from flask_jwt_extended import (
     get_jwt
 )
 from datetime import timedelta
-import re
+from mailjet_rest import Client
+import os
+
 
 user_bp = Blueprint('users', __name__)
 
-# Utility: Check if current user is admin
+MAILJET_API_KEY = os.getenv("MAILJET_API_KEY")
+MAILJET_API_SECRET = os.getenv("MAILJET_API_SECRET")
+MAILJET_SENDER_EMAIL = os.getenv("MAILJET_SENDER_EMAIL")
+MAILJET_SENDER_NAME = os.getenv("MAILJET_SENDER_NAME")
+
+#  Utility: Check if current user is admin
 def is_admin():
     claims = get_jwt()
     return claims.get('role') == 'admin'
+
+
+def send_welcome_email(email, name):
+    mailjet = Client(auth=(MAILJET_API_KEY, MAILJET_API_SECRET), version='v3.1')
+
+    template = f"""
+    <h2>Welcome to Our Platform, {name}!</h2>
+    <p>We're thrilled to have you on board. Here’s what you can do:</p>
+    <ul>
+      <li>📝 Create and manage your spaces with ease.</li>
+      <li>🔐 Enjoy secure access using JWT authentication.</li>
+      <li>📷 Upload beautiful images directly.</li>
+      <li>📧 Receive important updates from us right in your inbox.</li>
+    </ul>
+    <p>Need help? Just reply to this email or contact our support team.</p>
+    <br>
+    <p>Cheers,</p>
+    <p><strong>{MAILJET_SENDER_NAME} Team</strong></p>
+    """
+
+    data = {
+        'Messages': [
+            {
+                "From": {
+                    "Email": MAILJET_SENDER_EMAIL,
+                    "Name": MAILJET_SENDER_NAME
+                },
+                "To": [
+                    {
+                        "Email": email,
+                        "Name": name
+                    }
+                ],
+                "Subject": "🎉 Welcome to Our Platform!",
+                "HTMLPart": template
+            }
+        ]
+    }
+
+    result = mailjet.send.create(data=data)
+    if result.status_code != 200:
+        print("Mailjet error:", result.json())
+
 
 @user_bp.route('/logout', methods=['POST'])
 @jwt_required()
 def logout():
     response = jsonify({"message": "Logged out successfully"})
-    #unset_jwt_cookies(response)  # Use this if you're storing tokens in cookies
+    
     return response, 200
 # --------------------------
 # Register a new user
@@ -71,6 +121,8 @@ def register():
     new_user = User(name=name, email=email, password_hash=hashed_pw)
     db.session.add(new_user)
     db.session.commit()
+    
+    send_welcome_email(email,name)
 
     return jsonify({"message": "User registered successfully"}), 201
 
