@@ -79,8 +79,6 @@ def get_client_bookings():
 
     if not user or user.role != 'client':
         return jsonify({"error": "Only clients can view their bookings"}), 403
-    if not user or user.role != 'owner':
-        return jsonify({"error": "Only owners can view their bookings"}), 403
 
     bookings = Booking.query.filter_by(client_id=user.id).all()
     return jsonify([booking.to_dict() for booking in bookings]), 200
