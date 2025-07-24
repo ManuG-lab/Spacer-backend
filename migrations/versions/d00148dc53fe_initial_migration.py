@@ -1,8 +1,8 @@
-"""initial
+"""Initial migration
 
-Revision ID: 4d883ad2b12c
+Revision ID: d00148dc53fe
 Revises: 
-Create Date: 2025-07-17 20:10:02.558863
+Create Date: 2025-07-24 23:03:34.856990
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '4d883ad2b12c'
+revision = 'd00148dc53fe'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -50,7 +50,7 @@ def upgrade():
     op.create_table('bookings',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('client_id', sa.Integer(), nullable=False),
-    sa.Column('space_id', sa.Integer(), nullable=False),
+    sa.Column('space_id', sa.Integer(), nullable=True),
     sa.Column('start_datetime', sa.DateTime(), nullable=False),
     sa.Column('end_datetime', sa.DateTime(), nullable=False),
     sa.Column('duration_hours', sa.Integer(), nullable=True),
@@ -59,7 +59,7 @@ def upgrade():
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['client_id'], ['users.id'], ),
-    sa.ForeignKeyConstraint(['space_id'], ['spaces.id'], ),
+    sa.ForeignKeyConstraint(['space_id'], ['spaces.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('invoices',

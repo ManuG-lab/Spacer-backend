@@ -61,6 +61,8 @@ def get_client_bookings():
     """
     identity = get_jwt_identity()
     user = User.query.get(identity)
+    print("JWT Identity:", get_jwt_identity())
+
 
     if not user or user.role != 'client':
         return jsonify({"error": "Only clients can view their bookings"}), 403
