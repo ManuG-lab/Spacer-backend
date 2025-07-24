@@ -79,6 +79,8 @@ def get_client_bookings():
 
     if not user or user.role != 'client':
         return jsonify({"error": "Only clients can view their bookings"}), 403
+    if not user or user.role != 'owner':
+        return jsonify({"error": "Only owners can view their bookings"}), 403
 
     bookings = Booking.query.filter_by(client_id=user.id).all()
     return jsonify([booking.to_dict() for booking in bookings]), 200
@@ -175,3 +177,26 @@ def decline_booking(id):
     db.session.commit()
 
     return jsonify({"message": "Booking declined"}), 200
+
+@bookings_bp.route('/admin/bookings', methods=['GET']) 
+@jwt_required()
+def get_all_bookings():
+    """
+    Get all bookings (admin)
+    ---
+    tags:
+      - Bookings
+    security:
+      - Bearer: []
+    responses:
+      200:
+        description: List of all bookings
+    """
+    identity = get_jwt_identity()
+    user = User.query.get(identity)
+
+    if not user or user.role != 'admin':
+        return jsonify({"error": "Only admins can view all bookings"}), 403
+
+    bookings = Booking.query.all()
+    return jsonify([booking.to_dict() for booking in bookings]), 200 
