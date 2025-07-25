@@ -6,14 +6,96 @@ import os
 from mailjet_rest import Client
 
 
-api_key = os.getenv('MAILJET_API_KEY')
-api_secret = os.getenv('MAILJET_API_SECRET')
-mailjet = Client(auth=(api_key, api_secret), version='v3.1')
+MAILJET_API_KEY = os.getenv("MAILJET_API_KEY")
+MAILJET_API_SECRET = os.getenv("MAILJET_API_SECRET")
+MAILJET_SENDER_EMAIL = os.getenv("MAILJET_SENDER_EMAIL")
+MAILJET_SENDER_NAME = os.getenv("MAILJET_SENDER_NAME")
 
 payments_bp = Blueprint('payments', __name__)
 
 
+def send_invoice_email(user, space,booking, invoice_url, name, email):
+    mailjet = Client(auth=(MAILJET_API_KEY, MAILJET_API_SECRET), version='v3.1')
 
+    html_template = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px;">
+        <h2 style="color: #4CAF50;">📄 Invoice for Booking #{space.id}</h2>
+        <p>Hello {user.name},</p>
+        <p>Thank you for booking <strong>{space.title}</strong> at {space.location}.</p>
+        <hr>
+        <p><strong>Booking Date:</strong> {datetime.utcnow().strftime('%B %d, %Y')}</p>
+        <p><strong>Capacity:</strong> {space.capacity}</p>
+        <p><strong>Total Price:</strong> KSH{booking.amount:.2f}</p>
+        <hr>
+        <p>You can view your invoice <a href="{invoice_url}" style="color: #4CAF50;">here</a>.</p>
+        <p>Kind regards,<br><strong>Spacer Team</strong></p>
+    </div>
+    """
+
+    data = {
+      'Messages': [
+        {
+          "From": {
+            "Email": MAILJET_SENDER_EMAIL,
+            "Name": MAILJET_SENDER_NAME
+          },
+          "To": [
+            {
+              "Email": email,
+              "Name": name
+            }
+          ],
+          "Subject": f"Your Invoice for Booking #{space.id}",
+          "HTMLPart": html_template
+        }
+      ]
+    }
+
+    result = mailjet.send.create(data=data)
+    if result.status_code != 200:
+        current_app.logger.error(f"Failed to send email: {result.json()}")
+
+def send_payment_confirmation_email(name, email, space):
+    mailjet = Client(auth=(MAILJET_API_KEY, MAILJET_API_SECRET), version='v3.1')
+
+    email_data = {
+        'Messages': [
+            {
+                "From": {
+                    "Email": MAILJET_SENDER_EMAIL,
+                    "Name": MAILJET_SENDER_NAME
+                },
+                "To": [
+                    {
+                        "Email": email,
+                        "Name": name
+                    }
+                ],
+                "Subject": "Payment Confirmed for Your Booking",
+                "TextPart": f"Hi {name}, your payment for '{space.title}' has been confirmed.",
+                "HTMLPart": f"""
+                <div style="font-family: Arial, sans-serif; color: #333;">
+                    <h2 style="color: #4CAF50;">Hello {name},</h2>
+                    <p>We're excited to let you know that your payment for the booking at <strong>{space.title}</strong> has been <span style="color:green;"><strong>confirmed</strong></span>.</p>
+                    <p>Booking Details:</p>
+                    <ul>
+                        <li><strong>Space:</strong> {space.title}</li>
+                        <li><strong>Location:</strong> {space.location}</li>
+                        <li><strong>Payment Status:</strong> Confirmed</li>
+                        <li><strong>Date:</strong> {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}</li>
+                    </ul>
+                    <p>Thank you for using <strong>Spacer</strong>!</p>
+                    <br/>
+                    <p style="font-size: 0.9em; color: #888;">This is an automated message. Please do not reply.</p>
+                </div>
+                """
+            }
+        ]
+    }
+
+    result = mailjet.send.create(data=email_data)
+    if result.status_code != 200:
+        current_app.logger.error(f"Failed to send email: {result.json()}")
 
 @payments_bp.route('/payments', methods=['POST'])
 @jwt_required()
@@ -53,13 +135,11 @@ def create_payment():
     if not booking or booking.client_id != user.id:
         return jsonify({"error": "Unauthorized or invalid booking"}), 403
     
-    client_id = get_jwt_identity()
-
     payment = Payment(
         booking_id=data['booking_id'],
         amount=data['amount'],
         payment_method=data['payment_method'],
-        client_id=client_id,
+        client_id=user.id,
     )
     db.session.add(payment)
     db.session.commit()
@@ -98,8 +178,6 @@ def get_all_payments():
         # Owners can view payments related to their spaces
         space_ids = [space.id for space in Space.query.filter_by(owner_id=user.id).all()]
         payments = Payment.query.join(Booking).filter(Booking.space_id.in_(space_ids)).all()
-        client_ids = [booking.client_id for booking in Booking.query.filter(Booking.space_id.in_(space_ids)).all()]
-        payments = Payment.query.filter(Payment.client_id.in_(client_ids)).all()
     else:
         return jsonify({"error": "Unauthorized"}), 403
 
@@ -154,57 +232,9 @@ def confirm_payment(id):
     payment.payment_status = 'completed'
     payment.payment_date = datetime.utcnow()
     db.session.commit()
-
-     # Get the client details
+    # Get the client details
     client = User.query.get(booking.client_id)
-
-    # Mailjet API setup
-    mailjet = Client(
-        auth=(os.getenv("MAILJET_API_KEY"), os.getenv("MAILJET_API_SECRET")),
-        version='v3.1'
-    )
-
-    email_data = {
-        'Messages': [
-            {
-                "From": {
-                    "Email": "your_email@example.com",
-                    "Name": "Spacer"
-                },
-                "To": [
-                    {
-                        "Email": client.email,
-                        "Name": client.name
-                    }
-                ],
-                "Subject": "Payment Confirmed for Your Booking",
-                "TextPart": f"Hi {client.name}, your payment for '{space.title}' has been confirmed.",
-                "HTMLPart": f"""
-                <div style="font-family: Arial, sans-serif; color: #333;">
-                    <h2 style="color: #4CAF50;">Hello {client.name},</h2>
-                    <p>We're excited to let you know that your payment for the booking at <strong>{space.title}</strong> has been <span style="color:green;"><strong>confirmed</strong></span>.</p>
-                    <p>Booking Details:</p>
-                    <ul>
-                        <li><strong>Space:</strong> {space.title}</li>
-                        <li><strong>Location:</strong> {space.location}</li>
-                        <li><strong>Payment Status:</strong> Confirmed</li>
-                        <li><strong>Date:</strong> {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}</li>
-                    </ul>
-                    <p>Thank you for using <strong>Spacer</strong>!</p>
-                    <br/>
-                    <p style="font-size: 0.9em; color: #888;">This is an automated message. Please do not reply.</p>
-                </div>
-                """
-            }
-        ]
-    }
-
-    try:
-        result = mailjet.send.create(data=email_data)
-        if result.status_code != 200:
-            current_app.logger.error(f"Failed to send email: {result.json()}")
-    except Exception as e:
-        current_app.logger.error(f"Mailjet exception: {str(e)}")
+    send_payment_confirmation_email(client.name, client.email, space)
 
     return jsonify({"message": "Payment confirmed and email sent", "payment": payment.to_dict()}), 200
 
@@ -273,6 +303,7 @@ def create_invoice():
     """
     data = request.get_json()
     booking_id = data.get('booking_id')
+    issued_at = datetime.utcnow()
     if not booking_id:
         return jsonify({'message': 'Missing booking_id'}), 400
 
@@ -289,55 +320,19 @@ def create_invoice():
 
     invoice = Invoice(
         booking_id=booking_id,
-        invoice_url=invoice_url
+        invoice_url=invoice_url,
+        client_id=booking.client_id,
+        issued_at=issued_at
     )
     db.session.add(invoice)
     db.session.commit()
+    client = User.query.get(booking.client_id)
+    send_invoice_email(client, booking.space, invoice_url, client.name, client.email)
 
     # Send email using Mailjet
-    user = booking.user 
-    space = booking.space  
+     
 
-    html_template = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px;">
-        <h2 style="color: #4CAF50;">📄 Invoice for Booking #{booking.id}</h2>
-        <p>Hello {user.name},</p>
-        <p>Thank you for booking <strong>{space.title}</strong> at {space.location}.</p>
-        <hr>
-        <p><strong>Booking Date:</strong> {booking.created_at.strftime('%B %d, %Y')}</p>
-        <p><strong>Capacity:</strong> {space.capacity}</p>
-        <p><strong>Total Price:</strong> ${space.price_per_day:.2f}</p>
-        <hr>
-        <p>You can view your invoice <a href="{invoice_url}" style="color: #4CAF50;">here</a>.</p>
-        <p>Kind regards,<br><strong>Spacer Team</strong></p>
-    </div>
-    """
-
-    # Prepare Mailjet data
-
-    data = {
-      'Messages': [
-        {
-          "From": {
-            "Email": "no-reply@spacer.com",
-            "Name": "Spacer"
-          },
-          "To": [
-            {
-              "Email": user.email,
-              "Name": user.name
-            }
-          ],
-          "Subject": f"Your Invoice for Booking #{booking.id}",
-          "HTMLPart": html_template
-        }
-      ]
-    }
-
-    result = mailjet.send.create(data=data)
-    if result.status_code != 200:
-        return jsonify({'message': 'Invoice created, but email failed'}), 500
-
+   
     return jsonify({'message': 'Invoice created and sent successfully'}), 201
 
 @payments_bp.route('/invoices', methods=['GET'])

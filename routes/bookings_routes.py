@@ -133,4 +133,4 @@ def decline_booking(id):
     booking.status = 'declined'
     db.session.commit()
 
-    return jsonify({"message": "Booking declined", "booking": booking.to_dict()}), 200
+    return jsonify({"message": "Booking declined"}), 200
