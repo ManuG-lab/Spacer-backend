@@ -31,16 +31,17 @@ def create_booking():
 
     if start_datetime >= end_datetime:
         return jsonify({"error": "End time must be after start time"}), 400
+    
 
     new_booking = Booking(
         client_id=user.id,
         space_id=space.id,
         start_datetime=start_datetime,
-        end_datetime=end_datetime,
-        total_price=0,  # This will be calculated later
+        end_datetime=end_datetime
     )
 
     # Calculate duration & total price
+    new_booking.space = space
     new_booking.calculate_duration()
     new_booking.calculate_total_price()
 
@@ -135,3 +136,18 @@ def decline_booking(id):
     db.session.commit()
 
     return jsonify({"message": "Booking declined"}), 200
+
+@bookings_bp.route('/admin/bookings', methods =['GET'])
+@jwt_required()
+def get_all_bookings():
+    """
+    Get all bookings (admin only)
+    """
+    identity = get_jwt_identity()
+    user = User.query.get(identity)
+    if not user or user.role != 'admin':
+        return jsonify({"error": "Only admins can view all bookings"}), 403
+    
+    bookings = Booking.query.all()
+    return jsonify([booking.to_dict() for booking in bookings]), 200
+
