@@ -11,7 +11,7 @@ from routes.user_routes import user_bp
 from routes.spaces_routes import spaces_bp
 from routes.bookings_routes import bookings_bp
 from routes.payments_routes import payments_bp
-from routes.admin import admin_bp
+# from routes.admin import admin_bp
 # Load environment variables from .env
 load_dotenv()
 
@@ -53,7 +53,7 @@ def create_app(testing=True):
     CORS(app)
     
 
-    # ✅ Handle JWT errors globally
+    #  Handle JWT errors globally
 @jwt.unauthorized_loader
 def handle_missing_token(err):
     return jsonify({"error": "Authorization token is missing"}), 401

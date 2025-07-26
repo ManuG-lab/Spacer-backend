@@ -31,6 +31,7 @@ def create_booking():
 
     if start_datetime >= end_datetime:
         return jsonify({"error": "End time must be after start time"}), 400
+    
 
     new_booking = Booking(
         client_id=user.id,
@@ -40,6 +41,7 @@ def create_booking():
     )
 
     # Calculate duration & total price
+    new_booking.space = space
     new_booking.calculate_duration()
     new_booking.calculate_total_price()
 
@@ -135,6 +137,7 @@ def decline_booking(id):
 
     return jsonify({"message": "Booking declined"}), 200
 
+
 admin_bp = Blueprint("admin", __name__)
 
 @admin_bp.route("/api/admin/bookings", methods=["GET"])
@@ -148,3 +151,19 @@ def get_all_bookings():
 
     bookings = Booking.query.all()
     return jsonify([b.to_dict() for b in bookings]), 200
+
+@bookings_bp.route('/admin/bookings', methods =['GET'])
+@jwt_required()
+def get_all_bookings():
+    """
+    Get all bookings (admin only)
+    """
+    identity = get_jwt_identity()
+    user = User.query.get(identity)
+    if not user or user.role != 'admin':
+        return jsonify({"error": "Only admins can view all bookings"}), 403
+    
+    bookings = Booking.query.all()
+    return jsonify([booking.to_dict() for booking in bookings]), 200
+
+
