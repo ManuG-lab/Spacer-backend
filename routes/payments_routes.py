@@ -14,9 +14,8 @@ MAILJET_SENDER_NAME = os.getenv("MAILJET_SENDER_NAME")
 payments_bp = Blueprint('payments', __name__)
 
 
-def send_invoice_email(user, space,booking, invoice_url, name, email):
+def send_invoice_email(user, space, booking, invoice_url, email):
     mailjet = Client(auth=(MAILJET_API_KEY, MAILJET_API_SECRET), version='v3.1')
-
     html_template = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px;">
         <h2 style="color: #4CAF50;">📄 Invoice for Booking #{space.id}</h2>
@@ -31,7 +30,6 @@ def send_invoice_email(user, space,booking, invoice_url, name, email):
         <p>Kind regards,<br><strong>Spacer Team</strong></p>
     </div>
     """
-
     data = {
       'Messages': [
         {
@@ -42,7 +40,7 @@ def send_invoice_email(user, space,booking, invoice_url, name, email):
           "To": [
             {
               "Email": email,
-              "Name": name
+              "Name": user.name
             }
           ],
           "Subject": f"Your Invoice for Booking #{space.id}",
@@ -50,7 +48,6 @@ def send_invoice_email(user, space,booking, invoice_url, name, email):
         }
       ]
     }
-
     result = mailjet.send.create(data=data)
     if result.status_code != 200:
         current_app.logger.error(f"Failed to send email: {result.json()}")
@@ -327,7 +324,7 @@ def create_invoice():
     db.session.add(invoice)
     db.session.commit()
     client = User.query.get(booking.client_id)
-    send_invoice_email(client, booking.space, invoice_url, client.name, client.email)
+    send_invoice_email(client, booking.space, booking, invoice_url, client.email)
 
     # Send email using Mailjet
      

@@ -36,7 +36,8 @@ def create_booking():
         client_id=user.id,
         space_id=space.id,
         start_datetime=start_datetime,
-        end_datetime=end_datetime
+        end_datetime=end_datetime,
+        toal_price=0,  # This will be calculated later
     )
 
     # Calculate duration & total price
