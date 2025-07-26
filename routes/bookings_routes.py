@@ -12,7 +12,7 @@ def create_booking():
     """
     Create a new booking (client)
     """
-    identity = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     user = User.query.get(identity)
 
     if not user or user.role != 'client':
@@ -134,3 +134,17 @@ def decline_booking(id):
     db.session.commit()
 
     return jsonify({"message": "Booking declined"}), 200
+
+admin_bp = Blueprint("admin", __name__)
+
+@admin_bp.route("/api/admin/bookings", methods=["GET"])
+@jwt_required()
+def get_all_bookings():
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+
+    if not user or user.role != "admin":
+        return jsonify({"error": "Admins only"}), 403
+
+    bookings = Booking.query.all()
+    return jsonify([b.to_dict() for b in bookings]), 200

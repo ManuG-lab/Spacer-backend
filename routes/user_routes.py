@@ -16,7 +16,7 @@ MAILJET_SENDER_NAME = os.getenv("MAILJET_SENDER_NAME")
 
 #  Utility: Check if current user is admin
 def is_admin():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     user = User.query.get(user_id)
     return user and user.role == 'admin'
 
@@ -146,8 +146,8 @@ def login():
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
-
     user = User.query.filter_by(email=email).first()
+    
     if not user or not bcrypt.check_password_hash(user.password_hash, password):
         return jsonify({"error": "Invalid credentials"}), 401
 
@@ -326,3 +326,5 @@ def delete_user(user_id):
     db.session.delete(user)
     db.session.commit()
     return jsonify({"message": "User deleted successfully"})
+
+

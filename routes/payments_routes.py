@@ -202,7 +202,7 @@ def get_payment(id):
       200:
         description: Payment data
     """
-    identity = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     user = User.query.get(identity)
 
     payment = Payment.query.get_or_404(id)
@@ -382,3 +382,21 @@ def get_invoice(id):
         'invoice_url': invoice.invoice_url,
         'issued_at': invoice.issued_at.isoformat()
     })
+
+@payments_bp.route('/payments', methods=['GET'])
+@jwt_required()
+def get_payments():
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+
+    if user.role == 'admin':
+        payments = Payment.query.all()
+    elif user.role == 'client':
+        payments = Payment.query.join(Booking).filter(Booking.client_id == user.id).all()
+    elif user.role == 'owner':
+        space_ids = [s.id for s in Space.query.filter_by(owner_id=user.id)]
+        payments = Payment.query.join(Booking).filter(Booking.space_id.in_(space_ids)).all()
+    else:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    return jsonify([p.to_dict() for p in payments]), 200

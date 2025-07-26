@@ -11,7 +11,7 @@ from routes.user_routes import user_bp
 from routes.spaces_routes import spaces_bp
 from routes.bookings_routes import bookings_bp
 from routes.payments_routes import payments_bp
-
+from routes.admin import admin_bp
 # Load environment variables from .env
 load_dotenv()
 
@@ -51,6 +51,20 @@ def create_app(testing=True):
     Migrate(app, db)
     JWTManager(app)
     CORS(app)
+    
+
+    # ✅ Handle JWT errors globally
+@jwt.unauthorized_loader
+def handle_missing_token(err):
+    return jsonify({"error": "Authorization token is missing"}), 401
+
+@jwt.invalid_token_loader
+def handle_invalid_token(err):
+    return jsonify({"error": "Invalid token"}), 422
+
+@jwt.expired_token_loader
+def handle_expired_token(jwt_header, jwt_payload):
+    return jsonify({"error": "Token has expired"}), 401
 
     # Swagger setup with JWT Bearer authentication
     Swagger(app, template={
@@ -80,6 +94,8 @@ def create_app(testing=True):
     app.register_blueprint(spaces_bp, url_prefix='/api')
     app.register_blueprint(bookings_bp, url_prefix='/api')
     app.register_blueprint(payments_bp, url_prefix='/api')
+    app.register_blueprint(admin_bp)
+
 
     # Home route
     @app.route('/')
