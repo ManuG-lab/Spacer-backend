@@ -5,7 +5,7 @@ from flask_jwt_extended import JWTManager
 from flasgger import Swagger
 from flask_cors import CORS
 from dotenv import load_dotenv
-
+from models import db
 from extensions import db, bcrypt
 from routes.user_routes import user_bp
 from routes.spaces_routes import spaces_bp
@@ -34,7 +34,7 @@ def create_app(testing=True):
         db_name = os.getenv('DB_NAME')
         app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
     else:
-        app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///spacer.db"
+        app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///spacer.db"
 
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     TESTING = True 
@@ -71,7 +71,11 @@ def create_app(testing=True):
         "security": [{"Bearer": []}]
     })
 
-    # Register Blueprints with clear prefixes
+    
+    # with app.app_context():
+    #     db.create_all()
+
+    # Register Blueprints
     app.register_blueprint(user_bp, url_prefix='/api')
     app.register_blueprint(spaces_bp, url_prefix='/api')
     app.register_blueprint(bookings_bp, url_prefix='/api')
@@ -94,4 +98,3 @@ app = create_app()
 if __name__ == '__main__':
     debug_mode = os.getenv("FLASK_ENV", "development") == "development"
     app.run(debug=debug_mode)
-

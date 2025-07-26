@@ -92,6 +92,24 @@ class Booking(db.Model, SerializerMixin):
             hourly_price = self.space.price_per_hour
             self.total_price = round(hourly_price * self.duration_hours, 2)
 
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "client_id": self.client_id,
+            "space": {
+                "id": self.space.id if self.space else None,
+                "title": self.space.title if self.space else None,
+                "price_per_hour": self.space.price_per_hour if self.space else None
+            },
+            "start_datetime": self.start_datetime.isoformat() if self.start_datetime else None,
+            "end_datetime": self.end_datetime.isoformat() if self.end_datetime else None,
+            "duration_hours": self.duration_hours,
+            "total_price": self.total_price,
+            "status": self.status,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
+        }
+
     def __repr__(self):
         return f'<Booking {self.id}, Status: {self.status}>'
 
