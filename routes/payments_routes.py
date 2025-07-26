@@ -14,17 +14,17 @@ MAILJET_SENDER_NAME = os.getenv("MAILJET_SENDER_NAME")
 payments_bp = Blueprint('payments', __name__)
 
 
-def send_invoice_email(user, space, booking, invoice_url, email):
+def send_invoice_email(name, space, booking, invoice_url, email):
     mailjet = Client(auth=(MAILJET_API_KEY, MAILJET_API_SECRET), version='v3.1')
     html_template = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px;">
-        <h2 style="color: #4CAF50;">📄 Invoice for Booking #{space.id}</h2>
-        <p>Hello {user.name},</p>
+        <h2 style="color: #4CAF50;">📄 Invoice for Booking #{booking.id}</h2>
+        <p>Hello {name},</p>
         <p>Thank you for booking <strong>{space.title}</strong> at {space.location}.</p>
         <hr>
         <p><strong>Booking Date:</strong> {datetime.utcnow().strftime('%B %d, %Y')}</p>
         <p><strong>Capacity:</strong> {space.capacity}</p>
-        <p><strong>Total Price:</strong> KSH{booking.amount:.2f}</p>
+        <p><strong>Total Price:</strong> KSH{booking.total_price:.2f}</p>
         <hr>
         <p>You can view your invoice <a href="{invoice_url}" style="color: #4CAF50;">here</a>.</p>
         <p>Kind regards,<br><strong>Spacer Team</strong></p>
@@ -40,7 +40,7 @@ def send_invoice_email(user, space, booking, invoice_url, email):
           "To": [
             {
               "Email": email,
-              "Name": user.name
+              "Name": name
             }
           ],
           "Subject": f"Your Invoice for Booking #{space.id}",
@@ -321,10 +321,12 @@ def create_invoice():
         client_id=booking.client_id,
         issued_at=issued_at
     )
+    space = Space.query.get(booking.space_id)
+
     db.session.add(invoice)
     db.session.commit()
     client = User.query.get(booking.client_id)
-    send_invoice_email(client, booking.space, booking, invoice_url, client.email)
+    send_invoice_email(client.name, space, booking, invoice_url, client.email)
 
     # Send email using Mailjet
      
