@@ -2,6 +2,20 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, Space, User
+import cloudinary
+import cloudinary.uploader
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+    secure=True
+)
+
 
 spaces_bp = Blueprint('spaces', __name__)
 
@@ -118,6 +132,17 @@ def create_space():
         # Validate required fields
         if not all([title, description, location, capacity, price_per_hour, price_per_day]):
             return jsonify({"error": "Missing required fields"}), 400
+        
+         # Upload image to Cloudinary if provided
+        if main_image_url:
+            try:
+                upload_result = cloudinary.uploader.upload(
+                    main_image_url,
+                    folder="spacer/spaces"
+                )
+                main_image_url = upload_result.get("secure_url")
+            except Exception as e:
+                return jsonify({"error": f"Image upload failed: {str(e)}"}), 500
 
         # ✅ Convert amenities list to JSON string
         import json
